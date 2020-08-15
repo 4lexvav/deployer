@@ -1,0 +1,14 @@
+[Unit]
+Description=Deployer service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=centos
+ExecStart=/home/centos/deployer
+
+[Install]
+WantedBy=multi-user.target

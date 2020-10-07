@@ -45,6 +45,7 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 		imageName := r.FormValue("image")
 		token := r.FormValue("token")
 		user := r.FormValue("user")
+		net := r.FormValue("network")
 
 		authJSON, err := json.Marshal(types.AuthConfig{Username: user, Password: token})
 		if err != nil {
@@ -68,12 +69,8 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 
-		// Kill old container
-		// err = cli.ContainerKill(ctx, container.ID, "KILL")
 		if len(containers) > 0 {
 			oldContainer := containers[0]
-
-			io.WriteString(os.Stdout, oldContainer.Image+" "+oldContainer.ID)
 
 			if err = cli.ContainerStop(ctx, oldContainer.ID, nil); err != nil {
 				panic(err)
@@ -99,9 +96,7 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 			RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
 		}, &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				"bridge": {
-					Gateway: "jared_app-network",
-				},
+				net: {},
 			},
 		}, name)
 

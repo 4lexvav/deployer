@@ -12,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -46,7 +45,6 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 		imageName := r.FormValue("image")
 		token := r.FormValue("token")
 		user := r.FormValue("user")
-		path := r.FormValue("path")
 
 		authJSON, err := json.Marshal(types.AuthConfig{Username: user, Password: token})
 		if err != nil {
@@ -87,8 +85,6 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		io.WriteString(os.Stdout, "\n"+path+"/src/\n")
-
 		// Run new container
 		newContainer, err := cli.ContainerCreate(ctx, &container.Config{
 			Tty:        true,
@@ -100,23 +96,6 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 				"9000/tcp": struct{}{},
 			},
 		}, &container.HostConfig{
-			Mounts: []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: path + "/src/",
-					Target: "/var/www",
-				},
-				{
-					Type:   mount.TypeBind,
-					Source: path + "/docker/php/local.ini",
-					Target: "/usr/local/etc/php/conf.d/local.ini",
-				},
-				{
-					Type:   mount.TypeBind,
-					Source: path + "/src/.env",
-					Target: "/var/www/.env",
-				},
-			},
 			RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
 		}, &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{

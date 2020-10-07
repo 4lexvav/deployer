@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -24,8 +27,7 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 	// @TODO: auth request by checking Authorization Header
 
 	ctx := context.Background()
-	// cli, err := client.NewEnvClient()
-	cli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	cli, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
 	}
@@ -44,6 +46,7 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 		imageName := r.FormValue("image")
 		token := r.FormValue("token")
 		user := r.FormValue("user")
+		path := r.FormValue("path")
 
 		authJSON, err := json.Marshal(types.AuthConfig{Username: user, Password: token})
 		if err != nil {
@@ -56,12 +59,13 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 
+		io.Copy(os.Stdout, reader)
 		defer reader.Close()
 
 		args := filters.NewArgs()
 		args.Add("name", name)
 
-		containers, err := cli.ContainerList(ctx, types.ContainerListOptions{Filters: args})
+		containers, err := cli.ContainerList(ctx, types.ContainerListOptions{Filters: args, All: true})
 		if err != nil {
 			panic(err)
 		}
@@ -70,6 +74,8 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 		// err = cli.ContainerKill(ctx, container.ID, "KILL")
 		if len(containers) > 0 {
 			oldContainer := containers[0]
+
+			io.WriteString(os.Stdout, oldContainer.Image+" "+oldContainer.ID)
 
 			if err = cli.ContainerStop(ctx, oldContainer.ID, nil); err != nil {
 				panic(err)
@@ -81,22 +87,36 @@ func deployHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// docker run -d -t --name test --restart unless-stopped
-		// -e SERVICE_NAME=app -e SERVICE_TAGS=dev
-		// -w /var/www --network jared_app-network --expose 9000
-		// 4lexvav/jared:1.0.0 bash -c "/usr/bin/supervisord -n -c /etc/supervisord.conf"
+		io.WriteString(os.Stdout, "\n"+path+"/src/\n")
 
 		// Run new container
 		newContainer, err := cli.ContainerCreate(ctx, &container.Config{
 			Tty:        true,
 			Image:      imageName,
 			WorkingDir: "/var/www",
-			Env:        []string{"SERVICE_NAME=app", "SERVICE_TAGS=dev", "SERVICE_ROLE=web,cron,worker"},
+			Env:        []string{"SERVICE_NAME=app", "SERVICE_TAGS=dev"},
 			Cmd:        []string{"/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"},
 			ExposedPorts: nat.PortSet{
 				"9000/tcp": struct{}{},
 			},
 		}, &container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: path + "/src/",
+					Target: "/var/www",
+				},
+				{
+					Type:   mount.TypeBind,
+					Source: path + "/docker/php/local.ini",
+					Target: "/usr/local/etc/php/conf.d/local.ini",
+				},
+				{
+					Type:   mount.TypeBind,
+					Source: path + "/src/.env",
+					Target: "/var/www/.env",
+				},
+			},
 			RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
 		}, &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{

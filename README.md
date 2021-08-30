@@ -20,11 +20,11 @@ curl --request POST 'localhost:3000/deploy/' \
         "token": "{your-docker-hub-token}",
         "user": "{your-docker-hub-username}",
         "network": "{network-name to connect container to}",
-        "tty": true, // optional parameter
-        "env": { // here you can define environment variables
+        "tty": true,
+        "env": {
             "MY_VARIABLE": "VALUE"
         },
-        "volumes": [ // mount host volumes to container
+        "volumes": [
             {
                 "source": "/home/centos/src",
                 "target": "/var/www"

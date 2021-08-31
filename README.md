@@ -1,6 +1,6 @@
 # Deployer
 
-This script can used to deploy docker images on your server.
+This script can be used to deploy docker images on your server.
 
 Usage
 ---
